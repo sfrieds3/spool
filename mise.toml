@@ -1,0 +1,18 @@
+[tools]
+go = "1.27.4"
+
+[tasks.fmt]
+description = "Format Go source"
+run = "go fmt ./..."
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.vet]
+description = "Run Go static checks"
+run = "go vet ./..."
+
+[tasks.build]
+description = "Build the Spool CLI"
+run = "go build -o bin/spool ./cmd/spool"

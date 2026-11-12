@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "sources": [
+    {"id": "pi", "harness": "pi", "root": "@ROOT@/pi"},
+    {"id": "claude", "harness": "claude", "root": "@ROOT@/claude"},
+    {"id": "codex", "harness": "codex", "root": "@ROOT@/codex"},
+    {"id": "codex-archive", "harness": "codex", "root": "@ROOT@/codex-archive"}
+  ]
+}

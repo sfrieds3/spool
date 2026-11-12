@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  OPENSPEC_VERSION: 1.17.0
+
+jobs:
+  check:
+    name: Format, vet and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Run mise run fmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - run: mise run vet
+      - run: mise run test
+      - run: go test -race ./...
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_SHA::12}" -o "dist/spool" ./cmd/spool
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spool-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/spool
+          retention-days: 7
+
+  openspec:
+    name: OpenSpec validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch current main for PR validation
+        if: github.event_name == 'pull_request'
+        run: git fetch origin +refs/heads/main:refs/remotes/origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g "@fission-ai/openspec@$OPENSPEC_VERSION"
+      - run: python3 -m unittest discover -s scripts/tests
+      - run: openspec validate --all --strict --no-interactive
+      - run: openspec validate --archived --strict --no-interactive
+      - name: Validate proposed squash message
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/openspec_ci.py check-pr "$GITHUB_EVENT_PATH"
+
+  archive:
+    name: Propose completed OpenSpec archives
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, build, openspec]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: openspec-archive-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Skip stale pushes
+        id: current
+        run: |
+          git fetch origin main
+          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer main push will process all referenced changes.'
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.current.outputs.current == 'true'
+        with:
+          node-version: 24
+      - run: npm install -g "@fission-ai/openspec@$OPENSPEC_VERSION"
+        if: steps.current.outputs.current == 'true'
+      - name: Archive complete referenced changes
+        if: steps.current.outputs.current == 'true'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: python3 scripts/openspec_ci.py archive-push "$BEFORE" "$AFTER"
+      - name: Recheck main before publishing
+        id: publish-base
+        if: steps.current.outputs.current == 'true'
+        run: |
+          git fetch origin main
+          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Main advanced during archive generation; a later successful run will recover.'
+          fi
+      - uses: peter-evans/create-pull-request@v7
+        if: steps.publish-base.outputs.current == 'true'
+        with:
+          token: ${{ secrets.OPENSPEC_ARCHIVE_TOKEN || github.token }}
+          branch: automation/openspec-archive
+          base: main
+          add-paths: openspec/**
+          commit-message: |-
+            chore: archive completed OpenSpec changes
+
+            OpenSpec-Change: none
+            OpenSpec-Archive-Base: ${{ github.sha }}
+          title: 'chore: archive completed OpenSpec changes'
+          body: |-
+            Automated archive of completed, validated changes. Review the spec updates before merging.
+
+            Generated from main revision `${{ github.sha }}`. If stale, regenerate rather than rebase.
+
+            OpenSpec-Change: none
+
+  commits:
+    name: Conventional commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.yml

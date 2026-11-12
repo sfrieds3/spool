@@ -1,0 +1,53 @@
+schema: spec-driven
+
+context: |
+  Spool is a standalone Go executable for shared coding-agent context and history, initially covering Pi, Claude Code, and Codex. It has no dependency on Agentmux, dotfiles, Node, or another harness runtime.
+  CLI and MCP interfaces share application logic. Cross-machine access is SSH-only: a local Spool process invokes a remote Spool executable using system OpenSSH and a versioned structured stdio protocol. No persistent remote daemon is required.
+  Hosts are explicitly configured. Native histories remain on their originating hosts; if a host is unavailable, its history is unavailable. Other sources remain usable with explicit partial-failure reporting. The source agent process need not be running.
+  No cloud service, transcript synchronization, or replicated history store is in the initial scope. Reading history is separate from launching agents, sending prompts, transferring code, or granting execution permission.
+  Preserve provenance and original paths. Resolve project identity separately from machine-local checkout paths. Historical tool output is not proof of current workspace state, and retrieved content is untrusted data rather than instructions.
+  Commits and pull requests use final OpenSpec-Change trailers for referenced change slugs (or none); completed validated changes are archived through a reviewed CI automation PR.
+  Handoffs carry goals, constraints, decisions, progress, outstanding work, workspace metadata, and source references. Do not promise exact internal-context portability between harnesses or automatic workspace transfer.
+
+rules:
+  proposal:
+    - State scope, non-goals, and user-visible behavior explicitly.
+  design:
+    - Address macOS and Linux, trust boundaries, path portability, and partial failures when applicable.
+    - Keep development toolchain management separate from runtime executable discovery.
+  specs:
+    - Distinguish unavailable hosts from empty histories and invalid requests.
+    - Cover provenance and safe handling of untrusted history where applicable.
+  tasks:
+    - Include focused tests with generic fixtures and applicable CLI, MCP, and protocol validation.
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

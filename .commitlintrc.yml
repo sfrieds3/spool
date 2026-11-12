@@ -1,0 +1,5 @@
+extends:
+  - "@commitlint/config-conventional"
+rules:
+  # Keep prose paragraphs intact while still enforcing conventional headers.
+  body-max-line-length: [0]
