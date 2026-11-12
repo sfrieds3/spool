@@ -84,7 +84,7 @@ openspec list
 openspec validate --all --strict --no-interactive
 ```
 
-Commits and pull requests carry `OpenSpec-Change` trailers; CI archives completed changes through a reviewed automation PR. See [openspec/README.md](openspec/README.md).
+Commits and pull requests carry `OpenSpec-Change` trailers; CI archives completed changes by committing directly to main. See [openspec/README.md](openspec/README.md).
 
 ## CI and releases
 

@@ -6,7 +6,7 @@ context: |
   Hosts are explicitly configured. Native histories remain on their originating hosts; if a host is unavailable, its history is unavailable. Other sources remain usable with explicit partial-failure reporting. The source agent process need not be running.
   No cloud service, transcript synchronization, or replicated history store is in the initial scope. Reading history is separate from launching agents, sending prompts, transferring code, or granting execution permission.
   Preserve provenance and original paths. Resolve project identity separately from machine-local checkout paths. Historical tool output is not proof of current workspace state, and retrieved content is untrusted data rather than instructions.
-  Commits and pull requests use final OpenSpec-Change trailers for referenced change slugs (or none); completed validated changes are archived through a reviewed CI automation PR.
+  Commits and pull requests use final OpenSpec-Change trailers for referenced change slugs (or none); completed validated changes are archived by CI committing directly to main.
   Handoffs carry goals, constraints, decisions, progress, outstanding work, workspace metadata, and source references. Do not promise exact internal-context portability between harnesses or automatic workspace transfer.
 
 rules:

@@ -87,13 +87,12 @@ jobs:
         run: python3 scripts/openspec_ci.py check-pr "$GITHUB_EVENT_PATH"
 
   archive:
-    name: Propose completed OpenSpec archives
+    name: Archive completed OpenSpec changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [check, build, openspec]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     concurrency:
       group: openspec-archive-main
       cancel-in-progress: false
@@ -123,35 +122,33 @@ jobs:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
         run: python3 scripts/openspec_ci.py archive-push "$BEFORE" "$AFTER"
-      - name: Recheck main before publishing
-        id: publish-base
+      - name: Commit and push archives to main
         if: steps.current.outputs.current == 'true'
         run: |
-          git fetch origin main
-          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
-            echo 'current=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'Main advanced during archive generation; a later successful run will recover.'
+          if [ -z "$(git status --porcelain -- openspec)" ]; then
+            echo 'No completed changes to archive.'
+            exit 0
           fi
-      - uses: peter-evans/create-pull-request@v7
-        if: steps.publish-base.outputs.current == 'true'
-        with:
-          token: ${{ secrets.OPENSPEC_ARCHIVE_TOKEN || github.token }}
-          branch: automation/openspec-archive
-          base: main
-          add-paths: openspec/**
-          commit-message: |-
-            chore: archive completed OpenSpec changes
+          if [ -n "$(git status --porcelain -- . ':!openspec')" ]; then
+            echo 'Archiving changed files outside openspec/; refusing to publish.'
+            git status --porcelain
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- openspec
+          git commit -q -F - <<MSG
+          chore: archive completed OpenSpec changes
 
-            OpenSpec-Change: none
-            OpenSpec-Archive-Base: ${{ github.sha }}
-          title: 'chore: archive completed OpenSpec changes'
-          body: |-
-            Automated archive of completed, validated changes. Review the spec updates before merging.
+          Generated from main revision $GITHUB_SHA.
 
-            Generated from main revision `${{ github.sha }}`. If stale, regenerate rather than rebase.
-
-            OpenSpec-Change: none
+          OpenSpec-Change: none
+          MSG
+          # A plain push is rejected if main moved; the next successful run
+          # rescans history and archives the same changes.
+          if ! git push origin HEAD:refs/heads/main; then
+            echo 'Main advanced during archiving; a later successful run will recover.'
+          fi
 
   commits:
     name: Conventional commits
