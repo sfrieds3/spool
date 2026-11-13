@@ -319,3 +319,38 @@ func (f shortFile) Write(p []byte) (int, error) { return f.tempFile.Write(p[:len
 type syncFail struct{ tempFile }
 
 func (syncFail) Sync() error { return errors.New("injected sync") }
+
+func TestCreateInventsNothingAndRejectsUnsupportedSessions(t *testing.T) {
+	e := newEnv(t)
+	refs := e.refs(t)
+	h := e.create(t, fmt.Sprintf(`{"version":1,"goal":"g","sessions":[{"ref":%q},{"ref":%q}]}`, refs["pi"], refs["claude"]))
+	for _, l := range [][]string{h.Constraints, h.Decisions, h.Progress, h.Outstanding, h.Notes} {
+		if len(l) != 0 {
+			t.Fatalf("content derived from history: %+v", h)
+		}
+	}
+	if h.Title != nil || h.Goal != "g" {
+		t.Fatalf("handoff = %+v", h)
+	}
+
+	// A session whose external-history marker appears late in the file.
+	path := filepath.Join(e.sessions, "claude", "p", "late.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `{"type":"user","sessionId":"late","uuid":"u1","parentUuid":null,"cwd":"/home/example"}` + "\n" +
+		`{"type":"user","sessionId":"late","uuid":"u2","parentUuid":"u1","message":"` + strings.Repeat("x", history.MetadataScanBytes) + `"}` + "\n" +
+		`{"type":"fork-context-ref","agentId":"a","parentSessionId":"other","parentLastUuid":"u0","contextLength":3}` + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ref := history.Ref{SourceID: "claude", Harness: "claude", Path: "p/late.jsonl", NativeID: "late"}.Encode()
+	before := e.entries(t)
+	e.clock = e.clock.Add(time.Second)
+	if _, err := e.svc.Create(context.Background(), []byte(fmt.Sprintf(`{"version":1,"goal":"g","sessions":[{"ref":%q}]}`, ref))); err == nil || err.Code != history.CodeUnsupportedFormat {
+		t.Fatalf("unsupported = %v", err)
+	}
+	if after := e.entries(t); len(after) != len(before) {
+		t.Fatalf("entries changed: %v -> %v", before, after)
+	}
+}

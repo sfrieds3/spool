@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -196,11 +195,7 @@ func TestShow(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
-		"fifo": func(id string) {
-			if err := syscall.Mkfifo(filepath.Join(e.dir(), fileName(id)), 0o600); err != nil {
-				t.Fatal(err)
-			}
-		},
+		"fifo": func(id string) { makeFifo(t, filepath.Join(e.dir(), fileName(id))) },
 	}
 	i := 0
 	for name, setup := range invalid {

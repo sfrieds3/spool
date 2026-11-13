@@ -222,3 +222,13 @@ func TestLiteralLines(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderPreservesItemOrder(t *testing.T) {
+	h := goldenHandoffs()["minimal"]
+	h.Outstanding = []string{"zeta first", "alpha second", "mid third"}
+	md := Render(h)
+	a, b, c := strings.Index(md, "- zeta first"), strings.Index(md, "- alpha second"), strings.Index(md, "- mid third")
+	if a < 0 || !(a < b && b < c) {
+		t.Fatalf("order not preserved:\n%s", md)
+	}
+}

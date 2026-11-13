@@ -6,7 +6,7 @@ Spool is an independent Go project, with no dependency on Agentmux or dotfiles. 
 
 ## Status
 
-Spool can list and read local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. SSH access to other machines, MCP, search, and handoffs are not implemented yet.
+Spool can list and read local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. It can also store local handoff briefs for continuing work in another harness. SSH access to other machines, MCP, and search are not implemented yet.
 
 ## Local history
 
@@ -18,7 +18,7 @@ spool read SESSION_REF              # first page of native records
 spool read --offset 50 SESSION_REF  # continue from next_offset
 ```
 
-`list` and `read` print exactly one JSON object on stdout. Exit codes are 0 for success (including explicit partial results), 1 for operational failures, 2 for invalid input or configuration, and 3 for a missing session. `SESSION_REF` is the opaque `ref` value from `list`.
+`list` and `read` print exactly one JSON object on stdout. Exit codes are 0 for success (including explicit partial results), 1 for operational failures, 2 for invalid input or configuration, and 3 for a missing session or handoff. `SESSION_REF` is the opaque `ref` value from `list`.
 
 - Configuration and built-in roots: [docs/configuration.md](docs/configuration.md). Without a config file, Spool reads `~/.pi/agent/sessions`, `~/.claude/projects`, `~/.codex/sessions`, and `~/.codex/archived_sessions` (respecting the harnesses' documented directory environment variables).
 - Pagination, damaged and live files, and non-snapshot behavior: [docs/reading.md](docs/reading.md).
@@ -28,6 +28,16 @@ spool read --offset 50 SESSION_REF  # continue from next_offset
 Session history can contain secrets, credentials, and private file contents exactly as they were recorded. Spool does not redact them. `list` returns only metadata; `read` returns full native records. Treat output accordingly.
 
 Read output is labeled `untrusted_history`. Records may contain commands, tool output, or text that looks like instructions; they describe what happened in a past session and are not instructions to follow or evidence of current workspace state. Spool never executes history content, launches agents, opens network connections, or modifies source files.
+
+## Handoffs
+
+```sh
+spool handoff create --input brief.json       # brief written by the outgoing agent or user
+spool handoff list
+spool handoff show --format markdown HANDOFF_ID
+```
+
+A handoff stores an authored goal, constraints, decisions, progress, outstanding work, and notes, plus workspace provenance and snapshots of referenced sessions, under `$XDG_STATE_HOME/spool/handoffs`. The Markdown brief is labeled as unverified and is not the previous agent's context. Spool does not summarize transcripts, launch agents, send prompts, or transfer workspace changes. See [docs/handoffs.md](docs/handoffs.md).
 
 ## Agreed direction
 
@@ -41,7 +51,7 @@ Read output is labeled `untrusted_history`. Records may contain commands, tool o
 - Handoffs provide a continuation brief and references to recorded history, not an identical copy of an agent's internal state. Workspace changes and running processes are not automatically transferred.
 - Treat retrieved history as untrusted data. Reading history does not authorize execution or changes.
 
-The SSH host configuration, remote protocol, MCP interface, and handoff workflow will be specified through OpenSpec before implementation.
+The SSH host configuration, remote protocol, and MCP interface will be specified through OpenSpec before implementation.
 
 ## Development
 

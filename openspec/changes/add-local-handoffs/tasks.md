@@ -27,14 +27,14 @@
 
 ## 5. CLI integration
 
-- [ ] 5.1 Add `spool handoff create --input FILE|-`, `list [--offset N] [--limit N]`, and `show [--format json|markdown] ID` routing, help text, `--config` support, and exit-code mapping for the new codes; verify CLI tests for success, missing or unknown subcommands, missing `--input`, invalid format, list pagination flags and out-of-range values, JSON errors when Markdown was requested, and every exit class.
-- [ ] 5.2 Add subprocess end-to-end tests over the synthetic fixtures with an isolated `XDG_STATE_HOME` and harness executables absent from PATH: create a handoff referencing Pi and Codex fixture sessions, list it, and show it in both formats; verify fixture hashes and directory entries are unchanged, only the handoff directory and file were written, and a test that walks `internal/handoff` and `cmd/spool` imports confirms no `os/exec`, `net`, or `net/http` use.
-- [ ] 5.3 Write `docs/handoffs.md` (brief schema, value rules, limits, storage location, permissions and trust model, provenance labels, ordering and pagination semantics, rendering safety and its limits, error table, secrets warning, non-goals) and update README status/examples and `docs/architecture.md` packages, write-path, and error table; verify a docs test checks that the documented example brief is accepted by the parser.
+- [x] 5.1 Add `spool handoff create --input FILE|-`, `list [--offset N] [--limit N]`, and `show [--format json|markdown] ID` routing, help text, `--config` support, and exit-code mapping for the new codes; verify CLI tests for success, missing or unknown subcommands, missing `--input`, invalid format, list pagination flags and out-of-range values, JSON errors when Markdown was requested, and every exit class.
+- [x] 5.2 Add subprocess end-to-end tests over the synthetic fixtures with an isolated `XDG_STATE_HOME` and harness executables absent from PATH: create a handoff referencing Pi and Codex fixture sessions, list it, and show it in both formats; verify fixture hashes and directory entries are unchanged, only the handoff directory and file were written, and a test that walks `internal/handoff` and `cmd/spool` imports confirms no `os/exec`, `net`, or `net/http` use.
+- [x] 5.3 Write `docs/handoffs.md` (brief schema, value rules, limits, storage location, permissions and trust model, provenance labels, ordering and pagination semantics, rendering safety and its limits, error table, secrets warning, non-goals) and update README status/examples and `docs/architecture.md` packages, write-path, and error table; verify a docs test checks that the documented example brief is accepted by the parser.
 
 ## 6. Validation
 
-- [ ] 6.1 Run `mise run fmt`, `mise run test`, `go test -race ./...`, `mise run vet`, `mise run build`, and Linux amd64/arm64 cross-builds locally on macOS; verify all pass, and confirm the filesystem tests (links, permissions, directory sync, FIFOs) also pass on the Linux CI runners before merge.
-- [ ] 6.2 Run `openspec validate add-local-handoffs --strict --no-interactive` and check each spec scenario against a test; verify every requirement has corresponding coverage before marking implementation complete.
+- [x] 6.1 Run `mise run fmt`, `mise run test`, `go test -race ./...`, `mise run vet`, `mise run build`, and Linux amd64/arm64 cross-builds locally on macOS; verify all pass, and confirm the filesystem tests (links, permissions, directory sync, FIFOs) also pass on the Linux CI runners before merge.
+- [x] 6.2 Run `openspec validate add-local-handoffs --strict --no-interactive` and check each spec scenario against a test; verify every requirement has corresponding coverage before marking implementation complete.
 
 ## Workflow follow-up
 

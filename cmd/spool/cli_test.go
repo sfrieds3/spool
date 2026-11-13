@@ -67,6 +67,9 @@ func newWorkspace(t *testing.T) workspace {
 	return w
 }
 
+// state returns the isolated XDG_STATE_HOME.
+func (w workspace) state() string { return filepath.Join(w.home, ".local-state") }
+
 func (w workspace) write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -78,7 +81,7 @@ func (w workspace) write(t *testing.T, path, content string) {
 }
 
 func (w workspace) env() config.Env {
-	vars := map[string]string{"XDG_CONFIG_HOME": filepath.Join(w.home, ".config")}
+	vars := map[string]string{"XDG_CONFIG_HOME": filepath.Join(w.home, ".config"), "XDG_STATE_HOME": w.state()}
 	return config.Env{
 		Getenv: func(k string) string { return vars[k] },
 		Home:   func() (string, error) { return w.home, nil },
@@ -249,6 +252,7 @@ func spool(t *testing.T, w workspace, args ...string) result {
 		"SPOOL_TEST_AS_MAIN=1",
 		"HOME=" + w.home,
 		"XDG_CONFIG_HOME=" + filepath.Join(w.home, ".config"),
+		"XDG_STATE_HOME=" + w.state(),
 		"PATH=" + filepath.Join(w.home, "empty-bin"),
 	}
 	cmd.Dir = w.home
