@@ -32,7 +32,6 @@ func (a app) handoffCmd(args []string) int {
 }
 
 // handoffService loads configuration and the state directory.
-// handoffService loads configuration and the state directory.
 func (a app) handoffService(path string) (*handoff.Service, int) {
 	cfg, code := a.config(path)
 	if cfg == nil {
@@ -94,12 +93,19 @@ func (a app) readInput(name string) ([]byte, *history.Error) {
 		}
 		r = a.stdin
 	} else {
+		info, err := os.Stat(name)
+		if err != nil {
+			return nil, invalidRequest("cannot read --input: %s", errText(err))
+		}
+		if !info.Mode().IsRegular() {
+			return nil, invalidRequest("--input must be a regular file or -")
+		}
 		f, err := os.Open(name)
 		if err != nil {
 			return nil, invalidRequest("cannot read --input: %s", errText(err))
 		}
 		defer f.Close()
-		info, err := f.Stat()
+		info, err = f.Stat()
 		if err != nil {
 			return nil, invalidRequest("cannot read --input: %s", errText(err))
 		}

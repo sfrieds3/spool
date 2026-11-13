@@ -169,7 +169,9 @@ func spoolRaw(t *testing.T, w workspace, stdin string, args ...string) (int, str
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(exe, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Env = []string{
 		"SPOOL_TEST_AS_MAIN=1",
 		"HOME=" + w.home,
@@ -182,6 +184,9 @@ func spoolRaw(t *testing.T, w workspace, stdin string, args ...string) (int, str
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err = cmd.Run()
+	if ctx.Err() != nil {
+		t.Fatalf("CLI did not finish: %v", ctx.Err())
+	}
 	code := 0
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {

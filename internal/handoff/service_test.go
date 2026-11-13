@@ -135,6 +135,38 @@ func TestCreateFailuresWriteNothing(t *testing.T) {
 	mustNotExist(t, e.state)
 }
 
+func TestCreateCanceledWithoutSessions(t *testing.T) {
+	for _, stage := range []string{"before create", "during metadata", "before publication"} {
+		t.Run(stage, func(t *testing.T) {
+			e := newEnv(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			switch stage {
+			case "before create":
+				cancel()
+			case "during metadata":
+				e.svc.opts.Getwd = func() (string, error) { cancel(); return "/workspace", nil }
+			case "before publication":
+				create := e.svc.ops.create
+				e.svc.ops.create = func(root *os.Root, name string) (tempFile, error) {
+					cancel()
+					return create(root, name)
+				}
+			}
+			if _, err := e.svc.Create(ctx, []byte(`{"version":1,"goal":"g"}`)); err == nil || err.Code != history.CodeCanceled {
+				t.Fatalf("canceled create = %v", err)
+			}
+			if stage == "before publication" {
+				if entries := e.entries(t); len(entries) != 0 {
+					t.Fatalf("canceled publication left files: %v", entries)
+				}
+			} else {
+				mustNotExist(t, e.state)
+			}
+		})
+	}
+}
+
 // Authored input alone cannot exceed MaxHandoffBytes (escapes do not expand
 // beyond their input spelling), but large session snapshots can, so the
 // encoded-size check is exercised directly.

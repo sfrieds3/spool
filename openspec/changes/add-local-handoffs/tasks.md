@@ -33,7 +33,7 @@
 
 ## 6. Validation
 
-- [x] 6.1 Run `mise run fmt`, `mise run test`, `go test -race ./...`, `mise run vet`, `mise run build`, and Linux amd64/arm64 cross-builds locally on macOS; verify all pass, and confirm the filesystem tests (links, permissions, directory sync, FIFOs) also pass on the Linux CI runners before merge.
+- [ ] 6.1 Run `mise run fmt`, `mise run test`, `go test -race ./...`, `mise run vet`, `mise run build`, and Linux amd64/arm64 cross-builds locally on macOS; verify all pass, and confirm the filesystem tests (links, permissions, directory sync, FIFOs) also pass on the Linux CI runners before merge.
 - [x] 6.2 Run `openspec validate add-local-handoffs --strict --no-interactive` and check each spec scenario against a test; verify every requirement has corresponding coverage before marking implementation complete.
 
 ## Workflow follow-up

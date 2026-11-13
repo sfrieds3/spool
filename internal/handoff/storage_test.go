@@ -24,6 +24,11 @@ func TestExclusionFromHistoryRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 	missingUnderLink := filepath.Join(link, "missing-root")
+	dangling := filepath.Join(base, "dangling")
+	danglingState := filepath.Join(base, "future-state")
+	if err := os.Symlink(filepath.Join(danglingState, "handoffs"), dangling); err != nil {
+		t.Fatal(err)
+	}
 	cases := map[string]struct {
 		root, state string
 	}{
@@ -33,6 +38,8 @@ func TestExclusionFromHistoryRoots(t *testing.T) {
 		"state via symlinked ancestor": {hist, filepath.Join(link, "state")},
 		"missing root under symlink":   {missingUnderLink, filepath.Join(hist, "missing-root", "x")},
 		"disabled source still counts": {hist, filepath.Join(hist, "s")},
+		"dangling root targets state":  {dangling, danglingState},
+		"root under dangling link":     {filepath.Join(dangling, "nested"), danglingState},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

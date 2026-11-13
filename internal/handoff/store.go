@@ -115,9 +115,14 @@ func canonical(p string) (string, error) {
 			}
 			return resolved, nil
 		}
-		// A missing path or dangling link: resolve what exists above it.
+		// Missing components can be appended to a resolved ancestor, but a
+		// dangling symlink cannot: doing so would discard its target and
+		// could hide an overlap with a history root. Fail closed instead.
 		if !errors.Is(err, fs.ErrNotExist) {
 			return "", err
+		}
+		if info, lerr := os.Lstat(cur); lerr == nil && info.Mode()&fs.ModeSymlink != 0 {
+			return "", fmt.Errorf("cannot resolve dangling symbolic link %s", cur)
 		}
 		parent := filepath.Dir(cur)
 		if parent == cur {

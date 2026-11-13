@@ -67,6 +67,9 @@ func (s *Service) Dir() string { return s.dir }
 // a new handoff. Nothing is written unless validation and every reference
 // succeed. Once published, later cleanup problems are reported as warnings.
 func (s *Service) Create(ctx context.Context, input []byte) (*CreateResponse, *history.Error) {
+	if err := ctx.Err(); err != nil {
+		return nil, errorf(history.CodeCanceled, "operation canceled: %v", err)
+	}
 	brief, herr := ParseBrief(input)
 	if herr != nil {
 		return nil, herr
@@ -121,6 +124,9 @@ func (s *Service) Create(ctx context.Context, input []byte) (*CreateResponse, *h
 		return nil, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, errorf(history.CodeCanceled, "operation canceled: %v", err)
+	}
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
 		return nil, stateErr("handoff directory %s cannot be created: %s", s.dir, errText(err))
 	}
@@ -134,7 +140,7 @@ func (s *Service) Create(ctx context.Context, input []byte) (*CreateResponse, *h
 	defer root.Close()
 
 	for attempt := 1; ; attempt++ {
-		published, err := s.publish(root, h.ID, data)
+		published, err := s.publish(ctx, root, h.ID, data)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +183,7 @@ func (s *Service) assignID(h *Handoff, created time.Time, data *[]byte) *history
 // final name. It returns (nil, nil) when the name is already taken, a
 // non-nil warning list (possibly empty) once published, or an error with
 // nothing published.
-func (s *Service) publish(root *os.Root, id string, data []byte) ([]history.Diagnostic, *history.Error) {
+func (s *Service) publish(ctx context.Context, root *os.Root, id string, data []byte) ([]history.Diagnostic, *history.Error) {
 	suffix, err := randomHex(s.opts.Random)
 	if err != nil {
 		return nil, errorf(history.CodeInternal, "cannot generate a temporary name: %v", err)
@@ -205,6 +211,10 @@ func (s *Service) publish(root *os.Root, id string, data []byte) ([]history.Diag
 	}
 	if err := f.Close(); err != nil {
 		return fail("close", err)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = s.ops.remove(root, tmp)
+		return nil, errorf(history.CodeCanceled, "operation canceled: %v", err)
 	}
 	if err := s.ops.link(root, tmp, fileName(id)); err != nil {
 		if errors.Is(err, fs.ErrExist) {
