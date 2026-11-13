@@ -51,6 +51,28 @@ func (s *Service) Read(ctx context.Context, req ReadRequest) (*ReadResponse, *Er
 	if err := checkPage(req.Offset, req.Limit); err != nil {
 		return nil, err
 	}
+	return s.scan(ctx, ref, req, true)
+}
+
+// Describe validates a session reference exactly as Read does, including a
+// full-file scan for identity and unsupported-format markers, and returns
+// its session metadata without collecting records. It succeeds exactly when
+// Read of the same reference would, with the same error codes.
+func (s *Service) Describe(ctx context.Context, refStr string) (*Session, *Error) {
+	ref, rerr := DecodeRef(refStr)
+	if rerr != nil {
+		return nil, rerr.(*Error)
+	}
+	resp, err := s.scan(ctx, ref, ReadRequest{Ref: refStr}, false)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Session, nil
+}
+
+// scan resolves ref through enabled sources and scans its file. When page is
+// false, no records are collected.
+func (s *Service) scan(ctx context.Context, ref Ref, req ReadRequest, page bool) (*ReadResponse, *Error) {
 	src, ok := s.source(ref.SourceID)
 	if !ok {
 		return nil, newError(CodeInvalidRequest, "session reference names a source that is not configured and enabled")
@@ -80,7 +102,7 @@ func (s *Service) Read(ctx context.Context, req ReadRequest) (*ReadResponse, *Er
 		return nil, newError(CodeSourceUnavailable, "session file cannot be opened: %s", errText(err))
 	}
 	defer f.Close()
-	return s.readFile(ctx, src, ref, f, info, req)
+	return s.readFile(ctx, src, ref, f, info, req, page)
 }
 
 func (s *Service) source(id string) (config.Source, bool) {
@@ -92,7 +114,7 @@ func (s *Service) source(id string) (config.Source, bool) {
 	return config.Source{}, false
 }
 
-func (s *Service) readFile(ctx context.Context, src config.Source, ref Ref, f *os.File, info os.FileInfo, req ReadRequest) (*ReadResponse, *Error) {
+func (s *Service) readFile(ctx context.Context, src config.Source, ref Ref, f *os.File, info os.FileInfo, req ReadRequest, page bool) (*ReadResponse, *Error) {
 	adapter := harness.ForHarness(src.Harness)
 	r := newLineReader(f, MaxLineBytes)
 	diags := &diagnostics{max: MaxDiagnostics}
@@ -100,7 +122,7 @@ func (s *Service) readFile(ctx context.Context, src config.Source, ref Ref, f *o
 	var records []Record
 	recordBudget := int64(MaxResponseBytes - envelopeReserve - diagnosticReserve - sessionReserve)
 	var used int64
-	pageOpen := true
+	pageOpen := page
 	var next *int64
 	eof := false
 	path := ptr(ref.Path)

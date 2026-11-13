@@ -10,6 +10,10 @@ Spool reads local agent history from configured source roots. Configuration is o
 
 This is Spool's runtime configuration. It is unrelated to the development `mise.toml`.
 
+## State directory
+
+Spool stores its own data, currently only [handoffs](handoffs.md), under `$XDG_STATE_HOME/spool`, or `~/.local/state/spool` when `XDG_STATE_HOME` is unset. This is the same on macOS and Linux. `XDG_STATE_HOME` must be absolute when set; a relative value is `invalid_config`. The state directory is created only when a handoff is first created, and is never inside a configured history root.
+
 ## Format
 
 Configuration is strict JSON with schema version 1:
