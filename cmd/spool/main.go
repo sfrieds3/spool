@@ -41,6 +41,8 @@ func (a app) run(args []string) int {
 			return a.list(args[1:])
 		case "read":
 			return a.read(args[1:])
+		case "search":
+			return a.search(args[1:])
 		}
 	}
 	flags := flag.NewFlagSet("spool", flag.ContinueOnError)
@@ -71,8 +73,9 @@ func usage(flags *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: spool [--version | --help]")
 	fmt.Fprintln(w, "       spool list [--config FILE] [--harness pi|claude|codex] [--offset N] [--limit N]")
 	fmt.Fprintln(w, "       spool read [--config FILE] [--offset N] [--limit N] SESSION_REF")
+	fmt.Fprintln(w, "       spool search [--config FILE] [--harness pi|claude|codex] [--case-sensitive] [--limit N] [--cursor CURSOR] QUERY")
 	fmt.Fprintln(w, "\nRead-only access to local Pi, Claude Code, and Codex session history.")
-	fmt.Fprintln(w, "list and read print one JSON object on stdout. Session content is untrusted historical data.")
+	fmt.Fprintln(w, "list, read, and search print one JSON object on stdout. Session content is untrusted historical data.")
 	fmt.Fprintf(w, "Defaults: --offset 0, --limit %d (maximum %d).\n", history.DefaultLimit, history.MaxLimit)
 	fmt.Fprintln(w, "Exit codes: 0 success or partial success, 1 operational failure, 2 invalid input or configuration, 3 session not found.")
 	flags.PrintDefaults()
@@ -98,12 +101,19 @@ func newFlagSet(name string, pf *pageFlags) *flag.FlagSet {
 func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
 	var positional []string
 	for {
+		original := args
 		if err := fs.Parse(args); err != nil {
 			return nil, err
 		}
 		args = fs.Args()
 		if len(args) == 0 {
 			return positional, nil
+		}
+		// flag.Parse strips its consumed --. Respect that boundary instead
+		// of reparsing a following dash-prefixed literal as another flag.
+		consumed := len(original) - len(args)
+		if consumed > 0 && original[consumed-1] == "--" {
+			return append(positional, args...), nil
 		}
 		if args[0] == "--" {
 			return append(positional, args[1:]...), nil
@@ -124,41 +134,64 @@ func (a app) list(args []string) int {
 	if len(pos) != 0 {
 		return a.fail(&history.Error{Code: history.CodeInvalidRequest, Message: fmt.Sprintf("unexpected argument %q", pos[0])})
 	}
-	svc, code := a.service(pf.config)
-	if svc == nil {
-		return code
-	}
-	ctx, stop := signal.NotifyContext(a.ctx, os.Interrupt)
-	defer stop()
-	resp, herr := svc.List(ctx, history.ListRequest{Harness: *harness, Offset: pf.offset, Limit: pf.limit})
-	if herr != nil {
-		return a.fail(herr)
-	}
-	return a.emit(resp, exitOK)
+	return a.serve(pf.config, func(ctx context.Context, svc *history.Service) (any, *history.Error) {
+		return svc.List(ctx, history.ListRequest{Harness: *harness, Offset: pf.offset, Limit: pf.limit})
+	})
 }
 
 func (a app) read(args []string) int {
 	var pf pageFlags
 	fs := newFlagSet("read", &pf)
+	ref, err := parseOne(fs, args, "session reference")
+	if err != nil {
+		return a.fail(err)
+	}
+	return a.serve(pf.config, func(ctx context.Context, svc *history.Service) (any, *history.Error) {
+		return svc.Read(ctx, history.ReadRequest{Ref: ref, Offset: pf.offset, Limit: pf.limit})
+	})
+}
+
+func (a app) search(args []string) int {
+	fs := flag.NewFlagSet("spool search", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	configPath := fs.String("config", "", "Configuration file")
+	harness := fs.String("harness", "", "Only search this harness")
+	caseSensitive := fs.Bool("case-sensitive", false, "Compare exact code points")
+	limit := fs.Int("limit", history.DefaultLimit, "Maximum hits (1 to 500)")
+	cursor := fs.String("cursor", "", "Continuation cursor")
+	query, err := parseOne(fs, args, "search query")
+	if err != nil {
+		return a.fail(err)
+	}
+	return a.serve(*configPath, func(ctx context.Context, svc *history.Service) (any, *history.Error) {
+		return svc.Search(ctx, history.SearchRequest{Query: query, Harness: *harness, CaseSensitive: *caseSensitive, Limit: *limit, Cursor: *cursor})
+	})
+}
+
+func parseOne(fs *flag.FlagSet, args []string, missing string) (string, *history.Error) {
 	pos, err := parseArgs(fs, args)
 	if err != nil {
-		return a.fail(&history.Error{Code: history.CodeInvalidRequest, Message: flagMessage(err)})
+		return "", &history.Error{Code: history.CodeInvalidRequest, Message: flagMessage(err)}
 	}
-	switch {
-	case len(pos) == 0:
-		return a.fail(&history.Error{Code: history.CodeInvalidRequest, Message: "missing session reference"})
-	case len(pos) > 1:
-		return a.fail(&history.Error{Code: history.CodeInvalidRequest, Message: fmt.Sprintf("unexpected argument %q", truncate(pos[1]))})
+	if len(pos) == 0 {
+		return "", &history.Error{Code: history.CodeInvalidRequest, Message: "missing " + missing}
 	}
-	svc, code := a.service(pf.config)
+	if len(pos) > 1 {
+		return "", &history.Error{Code: history.CodeInvalidRequest, Message: fmt.Sprintf("unexpected argument %q", truncate(pos[1]))}
+	}
+	return pos[0], nil
+}
+
+func (a app) serve(path string, run func(context.Context, *history.Service) (any, *history.Error)) int {
+	svc, code := a.service(path)
 	if svc == nil {
 		return code
 	}
 	ctx, stop := signal.NotifyContext(a.ctx, os.Interrupt)
 	defer stop()
-	resp, herr := svc.Read(ctx, history.ReadRequest{Ref: pos[0], Offset: pf.offset, Limit: pf.limit})
-	if herr != nil {
-		return a.fail(herr)
+	resp, err := run(ctx, svc)
+	if err != nil {
+		return a.fail(err)
 	}
 	return a.emit(resp, exitOK)
 }

@@ -46,6 +46,38 @@ func TestReadingDocExample(t *testing.T) {
 
 // TestFormatsDocFixtures ensures every fixture directory named in the format
 // matrix exists and is exercised by the end-to-end listing.
+func TestSearchDocExample(t *testing.T) {
+	data, err := os.ReadFile("../../docs/search.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, claim := range []string{"--config FILE", "--cursor 'q1.…' widget", "`match_start`", "`next_cursor`", "`partial`", "128 MiB", "unredacted", "unterminated tail"} {
+		if !strings.Contains(text, claim) {
+			t.Errorf("search docs missing %q", claim)
+		}
+	}
+	w := newWorkspace(t)
+	first := w.run(t, "search", "--config", w.config, "--limit", "1", "widget")
+	if first.code != 0 || first.json["content"] != "untrusted_history" || first.json["view"] != "native_file_order" || first.json["limit"] != json.Number("1") || first.json["next_cursor"] == nil {
+		t.Fatalf("documented first page %s", first.stdout)
+	}
+	second := w.run(t, "search", "--config", w.config, "--limit", "20", "--cursor", first.json["next_cursor"].(string), "widget")
+	if second.code != 0 || len(second.json["hits"].([]any)) == 0 {
+		t.Fatalf("documented continuation %s", second.stdout)
+	}
+	for _, key := range []string{"version", "ok", "content", "view", "sources", "hits", "limit", "next_cursor", "eof", "partial", "diagnostics", "omitted_diagnostics"} {
+		if _, ok := first.json[key]; !ok {
+			t.Errorf("missing documented response field %s", key)
+		}
+	}
+	for _, key := range []string{"session", "line", "type", "subtype", "id", "parent_id", "timestamp", "field", "snippet", "match_start", "match_end", "truncated_before", "truncated_after"} {
+		if _, ok := first.json["hits"].([]any)[0].(map[string]any)[key]; !ok {
+			t.Errorf("missing documented hit field %s", key)
+		}
+	}
+}
+
 func TestFormatsDocFixtures(t *testing.T) {
 	doc, err := os.ReadFile("../../docs/formats.md")
 	if err != nil {

@@ -1,13 +1,13 @@
 # Architecture: local session access
 
-This document describes the internal boundaries behind `spool list` and `spool read`. It covers only local history; SSH and MCP access are not implemented and have no interfaces yet.
+This document describes the internal boundaries behind `spool list`, `spool read`, and `spool search`. It covers only local history; SSH and MCP access are not implemented and have no interfaces yet.
 
 ## Packages
 
 - [`internal/config`](../internal/config) loads the strict version-1 runtime configuration and resolves built-in roots from an injectable environment. See [configuration.md](configuration.md).
-- [`internal/harness`](../internal/harness) contains one adapter per harness. An adapter interprets individual native JSON lines: it identifies session identity, record type, native ID/parent/timestamp fields, native titles, and markers for history stored outside the file. Adapters never open files, follow references, or execute content.
+- [`internal/harness`](../internal/harness) contains one adapter per harness. An adapter interprets individual native JSON lines: it identifies session identity, record type, native ID/parent/timestamp fields, native titles, and markers for history stored outside the file. Pure `SearchText` projects only allowlisted decoded text leaves (see [search.md](search.md)); adapters never open files, follow references, or execute content.
 - [`internal/jsonl`](../internal/jsonl) reads physical lines incrementally and discards bytes of lines larger than the line limit without buffering them.
-- [`internal/history`](../internal/history) is the transport-independent service. It owns source roots, confined file access, discovery, references, pagination, diagnostics, and response types. `Service.List` and `Service.Read` take a context and typed requests and return response values or a typed `*history.Error`.
+- [`internal/history`](../internal/history) is the transport-independent service. It owns source roots, confined file access, discovery, references, pagination, diagnostics, and response types. `Service.List`, `Service.Read`, and `Service.Search` take a context and typed requests and return response values or a typed `*history.Error`. Search alone validates each captured file extent on its confined open handle before releasing provisional hits; neither List nor Read pagination changes.
 - [`cmd/spool`](../cmd/spool) parses arguments, calls the service, and writes one JSON object to stdout. Future interfaces should call the same service rather than parse histories themselves.
 
 ## Source adapter boundary
@@ -29,11 +29,11 @@ A reference resolves only through a configured, enabled source with the same har
 
 ## Confinement
 
-Each source root is opened once with `os.OpenRoot`; a root that is itself a symbolic link is resolved at that point and the opened directory is the boundary. Discovery walks directory entries without following nested symbolic links and reports them as `symlink_skipped`. Opening a file checks every path component with `Lstat`, rejects symbolic links and non-regular files, opens through the root with `O_NONBLOCK` on Unix, and verifies the opened file is the inspected regular file. Spool never writes, creates caches, changes permissions, or launches processes.
+Each source root is opened once with `os.OpenRoot`; a root that is itself a symbolic link is resolved at that point and the opened directory is the boundary. Discovery walks directory entries without following nested symbolic links and reports them as `symlink_skipped`. Opening a file checks every path component with `Lstat`, rejects symbolic links and non-regular files, opens through the root with `O_NONBLOCK` on Unix, and verifies the opened file is the inspected regular file. Spool never writes, creates caches, changes permissions, or launches processes. Search adds no native file mutations, persistence, network access, or subprocesses; it returns unredacted sensitive snippets that must remain untrusted historical data.
 
 ## Responses and errors
 
-Every `list` or `read` invocation writes exactly one JSON object and a newline to stdout. Successful responses have `version: 1` and `ok: true`; failures have `version: 1`, `ok: false`, and `error: {code, message}`. Stderr is used only if stdout cannot be written and never contains transcript content.
+Every `list`, `read`, or `search` invocation writes exactly one JSON object and a newline to stdout. Successful responses have `version: 1` and `ok: true`; failures have `version: 1`, `ok: false`, and `error: {code, message}`. Stderr is used only if stdout cannot be written and never contains transcript content.
 
 | Error code | Exit | Meaning |
 | --- | --- | --- |
@@ -46,4 +46,4 @@ Every `list` or `read` invocation writes exactly one JSON object and a newline t
 | `invalid_history` | 1 | The required header or identity record is malformed. |
 | `canceled`, `internal_error` | 1 | Interrupted or unexpected failure. |
 
-Successful responses may be partial. Source states are `ready`, `absent` (a built-in default root that does not exist), and `error`. Diagnostics carry `code`, `message`, `source_id`, `path`, and `line` (null when not applicable). At most 64 diagnostics are returned per response; `omitted_diagnostics` counts the rest. See [reading.md](reading.md) for pagination semantics.
+Successful responses may be partial. Source states are `ready`, `absent` (a built-in default root that does not exist), and `error`. Diagnostics carry `code`, `message`, `source_id`, `path`, and `line` (null when not applicable). At most 64 diagnostics are returned per response; `omitted_diagnostics` counts the rest. See [reading.md](reading.md) for existing List/Read pagination and [search.md](search.md) for search's separate canonical request-bound row/line cursor, captured-extent checks, response and native byte limits, diagnostic delivery, non-snapshot semantics, and the fact that existing tree discovery is not itself bounded by those native-byte/row scan limits.
