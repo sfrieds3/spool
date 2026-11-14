@@ -61,6 +61,40 @@ func TestConfinementAndSymlinks(t *testing.T) {
 	}
 }
 
+func TestSearchConfinedRegularFiles(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	outside := filepath.Join(base, "outside")
+	writeFile(t, filepath.Join(root, "safe.jsonl"), pi3("safe", searchBody("needle")))
+	writeFile(t, filepath.Join(outside, "secret.jsonl"), pi3("secret", searchBody("needle")))
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.jsonl"), filepath.Join(root, "link.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(filepath.Join(root, "pipe.jsonl"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(base, "selected-root")
+	if err := os.Symlink(root, linked); err != nil {
+		t.Fatal(err)
+	}
+	r := mustSearch(t, svc(cfgSource("pi", "pi", linked)), SearchRequest{Query: "needle"})
+	if len(r.Hits) != 1 || r.Hits[0].Session.NativeID != "safe" || r.Hits[0].Session.OriginalPath != filepath.Join(linked, "safe.jsonl") || !r.Partial {
+		t.Fatalf("confined search %+v", r)
+	}
+	codes := map[string]string{}
+	for _, d := range r.Diagnostics {
+		if d.Path != nil {
+			codes[*d.Path] = d.Code
+		}
+	}
+	if codes["escape"] != DiagSymlinkSkipped || codes["link.jsonl"] != DiagSymlinkSkipped || codes["pipe.jsonl"] != DiagNotRegularFile {
+		t.Fatalf("issues %v", codes)
+	}
+}
+
 func TestSelectedRootMayBeSymlink(t *testing.T) {
 	base := t.TempDir()
 	real := filepath.Join(base, "real")
