@@ -1,5 +1,5 @@
 //go:build !unix
 
-package history
+package safefile
 
 const openNonblock = 0

@@ -1,6 +1,6 @@
 //go:build unix
 
-package history
+package safefile
 
 import "syscall"
 

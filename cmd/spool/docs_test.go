@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/sfrieds3/spool/internal/handoff"
 )
 
 // TestReadingDocExample verifies the documented continuation, partial, and
@@ -67,5 +70,34 @@ func TestFormatsDocFixtures(t *testing.T) {
 	}
 	if !strings.Contains(string(doc), "Compatibility with every installed release is not claimed") {
 		t.Error("formats.md must not claim exhaustive compatibility")
+	}
+}
+
+// TestHandoffsDocExample checks that the documented example brief is accepted
+// by the parser and that documented limits match the code.
+func TestHandoffsDocExample(t *testing.T) {
+	doc, err := os.ReadFile("../../docs/handoffs.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(doc)
+	start := strings.Index(text, "## Brief format (version 1)")
+	block := text[start:]
+	open := strings.Index(block, "```json\n") + len("```json\n")
+	example := block[open : open+strings.Index(block[open:], "```")]
+	if _, herr := handoff.ParseBrief([]byte(example)); herr != nil {
+		t.Fatalf("documented brief rejected: %v", herr)
+	}
+	for _, claim := range []string{
+		fmt.Sprintf("| Brief input | %d KiB |", handoff.MaxInputBytes>>10),
+		fmt.Sprintf("| `title` | %d |", handoff.MaxTitleBytes),
+		fmt.Sprintf("| Items per list | %d |", handoff.MaxItems),
+		fmt.Sprintf("| `sessions` | %d entries |", handoff.MaxSessions),
+		fmt.Sprintf("| Encoded stored handoff | %d MiB |", handoff.MaxHandoffBytes>>20),
+		handoff.Preamble,
+	} {
+		if !strings.Contains(text, claim) {
+			t.Errorf("docs/handoffs.md no longer states %q", claim)
+		}
 	}
 }
