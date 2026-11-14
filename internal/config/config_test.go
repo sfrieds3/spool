@@ -278,3 +278,20 @@ func TestDocumentedExampleLoads(t *testing.T) {
 		t.Fatal("docs must state that SSH hosts are not supported yet")
 	}
 }
+
+func TestStateDir(t *testing.T) {
+	p, err := StateDir(fakeEnv("/home/u", nil))
+	if err != nil || p != "/home/u/.local/state/spool" {
+		t.Fatalf("home fallback = %q %v", p, err)
+	}
+	p, err = StateDir(fakeEnv("", map[string]string{"XDG_STATE_HOME": "/x/state/"}))
+	if err != nil || p != "/x/state/spool" {
+		t.Fatalf("xdg = %q %v", p, err)
+	}
+	if _, err := StateDir(fakeEnv("/home/u", map[string]string{"XDG_STATE_HOME": "rel"})); !isInvalid(err) {
+		t.Fatalf("relative XDG_STATE_HOME err = %v", err)
+	}
+	if _, err := StateDir(fakeEnv("", nil)); !isInvalid(err) {
+		t.Fatalf("missing home err = %v", err)
+	}
+}

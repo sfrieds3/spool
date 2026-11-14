@@ -5,14 +5,14 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
-	"strings"
+
+	"github.com/sfrieds3/spool/internal/safefile"
 )
 
 var (
-	errSymlink    = errors.New("path traverses a symbolic link")
-	errNotRegular = errors.New("not a regular file")
+	errSymlink    = safefile.ErrSymlink
+	errNotRegular = safefile.ErrNotRegular
 )
 
 // openSourceRoot opens a source root. The root itself may be a symbolic link
@@ -80,36 +80,7 @@ func discover(ctx context.Context, root *os.Root, candidate func(string) bool) (
 // following symbolic links in any component, and without blocking on special
 // files.
 func openRegular(root *os.Root, rel string) (*os.File, os.FileInfo, error) {
-	name := filepath.FromSlash(rel)
-	parts := strings.Split(rel, "/")
-	var final os.FileInfo
-	for i := range parts {
-		info, err := root.Lstat(filepath.FromSlash(strings.Join(parts[:i+1], "/")))
-		if err != nil {
-			return nil, nil, err
-		}
-		if info.Mode()&fs.ModeSymlink != 0 {
-			return nil, nil, errSymlink
-		}
-		final = info
-	}
-	if !final.Mode().IsRegular() {
-		return nil, nil, errNotRegular
-	}
-	f, err := root.OpenFile(name, os.O_RDONLY|openNonblock, 0)
-	if err != nil {
-		return nil, nil, err
-	}
-	info, err := f.Stat()
-	if err != nil {
-		f.Close()
-		return nil, nil, err
-	}
-	if !info.Mode().IsRegular() || !os.SameFile(info, final) {
-		f.Close()
-		return nil, nil, errNotRegular
-	}
-	return f, info, nil
+	return safefile.OpenRegular(root, rel)
 }
 
 // errText reduces filesystem errors to their cause, omitting absolute paths

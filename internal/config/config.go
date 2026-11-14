@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/sfrieds3/spool/internal/strictjson"
 )
 
 // Version is the only supported configuration schema version.
@@ -132,6 +134,23 @@ func DefaultPath(env Env) (string, error) {
 		return "", invalid("cannot determine default configuration path: %v", err)
 	}
 	return filepath.Join(home, ".config", "spool", "config.json"), nil
+}
+
+// StateDir returns Spool's state directory: $XDG_STATE_HOME/spool, else
+// ~/.local/state/spool, on both macOS and Linux. It never creates it.
+func StateDir(env Env) (string, error) {
+	xdg, err := env.absEnv("XDG_STATE_HOME")
+	if err != nil {
+		return "", err
+	}
+	if xdg != "" {
+		return filepath.Join(xdg, "spool"), nil
+	}
+	home, err := env.home()
+	if err != nil {
+		return "", invalid("cannot determine state directory: %v", err)
+	}
+	return filepath.Join(home, ".local", "state", "spool"), nil
 }
 
 // Load resolves the configuration. An explicit path must exist. Without an
@@ -271,59 +290,16 @@ func validateSource(i int, fs fileSource) (Source, error) {
 }
 
 func decodeStrict(data []byte, v any) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
+	if err := strictjson.Decode(data, v); err != nil {
 		return invalid("%v", err)
-	}
-	if _, err := dec.Token(); err != io.EOF {
-		return invalid("unexpected trailing data")
 	}
 	return nil
 }
 
 // checkDuplicateKeys rejects objects that repeat a key at any depth.
 func checkDuplicateKeys(data []byte) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var walk func() error
-	walk = func() error {
-		tok, err := dec.Token()
-		if err != nil {
-			return invalid("%v", err)
-		}
-		delim, ok := tok.(json.Delim)
-		if !ok {
-			return nil
-		}
-		switch delim {
-		case '{':
-			keys := map[string]bool{}
-			for dec.More() {
-				kt, err := dec.Token()
-				if err != nil {
-					return invalid("%v", err)
-				}
-				key := kt.(string)
-				if keys[key] {
-					return invalid("duplicate key %q", key)
-				}
-				keys[key] = true
-				if err := walk(); err != nil {
-					return err
-				}
-			}
-		case '[':
-			for dec.More() {
-				if err := walk(); err != nil {
-					return err
-				}
-			}
-		}
-		if _, err := dec.Token(); err != nil {
-			return invalid("%v", err)
-		}
-		return nil
+	if err := strictjson.CheckDuplicateKeys(data); err != nil {
+		return invalid("%v", err)
 	}
-	return walk()
+	return nil
 }
