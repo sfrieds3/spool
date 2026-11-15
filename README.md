@@ -2,7 +2,7 @@
 
 Shared context and history for coding agents, across harnesses and machines.
 
-Spool is an independent Go project, with no dependency on Agentmux or dotfiles. The intended experience is to start work in Pi, continue in Claude Code or Codex, and retrieve relevant history from any configured machine.
+Use Spool to start work in Pi, continue in Claude Code or Codex, and retrieve relevant history from any configured machine.
 
 ## Status
 
