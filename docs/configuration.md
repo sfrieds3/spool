@@ -48,3 +48,7 @@ Built-in roots are resolved from the environment of the process running Spool. E
 | `claude` | `claude` | `$CLAUDE_CONFIG_DIR/projects`, else `~/.claude/projects` |
 | `codex` | `codex` | `$CODEX_HOME/sessions`, else `~/.codex/sessions` |
 | `codex-archive` | `codex` | `$CODEX_HOME/archived_sessions`, else `~/.codex/archived_sessions` |
+
+## Optional continuation drafting
+
+A `drafting` object can accompany `version: 1`, with or without `sources`: `{"provider":"example-provider","model":"example-model","thinking":"medium","timeout_seconds":120,"max_input_bytes":131072}`. Provider and model are required and passed exactly to Pi; there is no fallback model. Thinking can be off, minimal, low, medium, high, xhigh, or max. Timeout defaults to 120 seconds (1–600); encoded input defaults to 128 KiB (1 byte–1 MiB). Unknown, duplicate, null, or incorrectly typed fields are rejected. Without this object, browsing and existing commands work without Pi. Credentials and endpoints remain in Pi's trusted provider configuration, never in Spool config. Configuration is not consent: every model transmission requires disclosure confirmation and may send secrets to a remote provider at a cost.
