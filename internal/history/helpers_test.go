@@ -62,16 +62,23 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
+func mustResult[T any](t *testing.T, operation string, call func() (*T, *Error)) *T {
+	t.Helper()
+	result, err := call()
+	if err != nil {
+		t.Fatalf("%s: %v", operation, err)
+	}
+	return result
+}
+
 func mustList(t *testing.T, s *Service, req ListRequest) *ListResponse {
 	t.Helper()
-	if req.Limit == 0 {
-		req.Limit = DefaultLimit
-	}
-	resp, err := s.List(context.Background(), req)
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	return resp
+	return mustResult(t, "List", func() (*ListResponse, *Error) {
+		if req.Limit == 0 {
+			req.Limit = DefaultLimit
+		}
+		return s.List(context.Background(), req)
+	})
 }
 
 func mustRead(t *testing.T, s *Service, ref string, offset int64, limit int) *ReadResponse {

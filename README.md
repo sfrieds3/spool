@@ -6,7 +6,7 @@ Spool is an independent Go project, with no dependency on Agentmux or dotfiles. 
 
 ## Status
 
-Spool can list and read local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. It can also store local handoff briefs for continuing work in another harness. SSH access to other machines, MCP, and search are not implemented yet.
+Spool can list, read, and literally search local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. It can also store local handoff briefs for continuing work in another harness. SSH access to other machines, MCP, and semantic search are not implemented yet.
 
 ## Local history
 
@@ -16,16 +16,20 @@ spool list --harness codex --limit 20
 spool list --offset 20 --limit 20   # use next_offset from the previous page
 spool read SESSION_REF              # first page of native records
 spool read --offset 50 SESSION_REF  # continue from next_offset
+spool search 'widget.*'             # case-insensitive literal search (not regex)
+spool search --harness claude --limit 20 widget
+spool search --cursor 'q1.…' widget # use the exact next_cursor from a previous page
 ```
 
-`list` and `read` print exactly one JSON object on stdout. Exit codes are 0 for success (including explicit partial results), 1 for operational failures, 2 for invalid input or configuration, and 3 for a missing session or handoff. `SESSION_REF` is the opaque `ref` value from `list`.
+`list`, `read`, and `search` print exactly one JSON object on stdout. Exit codes are 0 for success (including explicit partial results), 1 for operational failures, 2 for invalid input or configuration, and 3 for a missing session or handoff. `SESSION_REF` is the opaque `ref` value from `list`.
 
 - Configuration and built-in roots: [docs/configuration.md](docs/configuration.md). Without a config file, Spool reads `~/.pi/agent/sessions`, `~/.claude/projects`, `~/.codex/sessions`, and `~/.codex/archived_sessions` (respecting the harnesses' documented directory environment variables).
-- Pagination, damaged and live files, and non-snapshot behavior: [docs/reading.md](docs/reading.md).
+- Pagination, damaged and live files, and non-snapshot behavior for List/Read: [docs/reading.md](docs/reading.md).
+- Search's precise text allowlist, snippets, bounds, diagnostics, and request-bound continuation: [docs/search.md](docs/search.md).
 - Supported formats and known unsupported cases: [docs/formats.md](docs/formats.md). Composite histories that depend on records outside the file, such as paginated Codex threads, Codex sessions with inherited history, and Claude fork-context references, are reported as `unsupported_format` instead of being returned incomplete.
 - Internal boundaries, references, and error codes: [docs/architecture.md](docs/architecture.md).
 
-Session history can contain secrets, credentials, and private file contents exactly as they were recorded. Spool does not redact them. `list` returns only metadata; `read` returns full native records. Treat output accordingly.
+Session history can contain secrets, credentials, and private file contents exactly as they were recorded. Spool does not redact them. `list` returns only metadata; `read` returns full native records; `search` returns bounded **unredacted** native text snippets and source citations. Treat output accordingly.
 
 Read output is labeled `untrusted_history`. Records may contain commands, tool output, or text that looks like instructions; they describe what happened in a past session and are not instructions to follow or evidence of current workspace state. Spool never executes history content, launches agents, opens network connections, or modifies source files.
 
@@ -68,11 +72,12 @@ mise run build
 ./bin/spool --version
 ```
 
-To try `list` and `read` against the synthetic fixtures:
+To try `list`, `read`, and `search` against the synthetic fixtures:
 
 ```sh
 sed "s#@ROOT@#$PWD/testdata/sessions#" testdata/fixtures-config.json.in > /tmp/spool-fixtures.json
 ./bin/spool list --config /tmp/spool-fixtures.json
+./bin/spool search --config /tmp/spool-fixtures.json widget
 ```
 
 Mise pins the development Go toolchain in `mise.toml`. End users will run compiled binaries and will not need Go, Node, or Mise. The Go module path is `github.com/sfrieds3/spool`.
