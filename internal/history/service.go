@@ -106,54 +106,10 @@ func (s *Service) List(ctx context.Context, req ListRequest) (*ListResponse, *Er
 	resp.Offset, resp.Limit = req.Offset, req.Limit
 	diags := &diagnostics{max: MaxDiagnostics}
 
-	var opened []*openedSource
-	defer func() {
-		for _, o := range opened {
-			if o.root != nil {
-				o.root.Close()
-			}
-		}
-	}()
-	selected := make([]config.Source, 0, len(s.sources))
-	for _, src := range s.sources {
-		if src.Enabled && (req.Harness == "" || src.Harness == req.Harness) {
-			selected = append(selected, src)
-		}
-	}
-	sortSources(selected)
-
-	var rows []row
-	failed := 0
-	for _, src := range selected {
-		if err := ctx.Err(); err != nil {
-			return nil, ctxError(err)
-		}
-		o := &openedSource{cfg: src, status: SourceStatus{ID: src.ID, Harness: src.Harness, Root: src.Root, State: SourceReady}}
-		opened = append(opened, o)
-		root, err := openSourceRoot(src.Root)
-		if err != nil {
-			if src.Default && errors.Is(err, fs.ErrNotExist) {
-				o.status.State = SourceAbsent
-				continue
-			}
-			o.status.State = SourceError
-			o.status.Error = ptr(errText(err))
-			failed++
-			continue
-		}
-		o.root = root
-		adapter := harness.ForHarness(src.Harness)
-		files, issues, err := discover(ctx, root, adapter.Candidate)
-		if err != nil {
-			if cerr := ctx.Err(); cerr != nil {
-				return nil, ctxError(cerr)
-			}
-			o.status.State = SourceError
-			o.status.Error = ptr(errText(err))
-			failed++
-			continue
-		}
-		rows = append(rows, mergeRows(len(opened)-1, files, issues)...)
+	selected, opened, rows, catalogErr := s.catalog(ctx, req.Harness)
+	defer closeOpened(opened)
+	if catalogErr != nil {
+		return nil, catalogErr
 	}
 	for _, o := range opened {
 		resp.Sources = append(resp.Sources, o.status)
@@ -161,7 +117,7 @@ func (s *Service) List(ctx context.Context, req ListRequest) (*ListResponse, *Er
 			diags.add(DiagSourceUnavailable, "source root cannot be read: "+*o.status.Error, ptr(o.cfg.ID), nil, nil)
 		}
 	}
-	if len(selected) > 0 && failed == len(selected) {
+	if len(selected) > 0 && allSourcesFailed(opened) {
 		e := newError(CodeSourcesUnavailable, "all requested sources failed")
 		e.Sources = resp.Sources
 		return nil, e
@@ -217,6 +173,67 @@ func (s *Service) List(ctx context.Context, req ListRequest) (*ListResponse, *Er
 	resp.OmittedDiagnostics = diags.omitted
 	resp.Partial = diags.count() > 0
 	return resp, nil
+}
+
+// catalog selects source roots and discovers deterministic candidate/issue rows
+// once. Both List and Search own the returned handles until closeOpened.
+func (s *Service) catalog(ctx context.Context, filter string) ([]config.Source, []*openedSource, []row, *Error) {
+	selected := make([]config.Source, 0, len(s.sources))
+	for _, src := range s.sources {
+		if src.Enabled && (filter == "" || src.Harness == filter) {
+			selected = append(selected, src)
+		}
+	}
+	sortSources(selected)
+	var opened []*openedSource
+	var rows []row
+	for _, src := range selected {
+		if err := ctx.Err(); err != nil {
+			return selected, opened, nil, ctxError(err)
+		}
+		o := &openedSource{cfg: src, status: SourceStatus{ID: src.ID, Harness: src.Harness, Root: src.Root, State: SourceReady}}
+		opened = append(opened, o)
+		root, err := openSourceRoot(src.Root)
+		if err != nil {
+			if src.Default && errors.Is(err, fs.ErrNotExist) {
+				o.status.State = SourceAbsent
+				continue
+			}
+			o.status.State, o.status.Error = SourceError, ptr(errText(err))
+			continue
+		}
+		o.root = root
+		files, issues, err := discover(ctx, root, harness.ForHarness(src.Harness).Candidate)
+		if err != nil {
+			if cerr := ctx.Err(); cerr != nil {
+				return selected, opened, nil, ctxError(cerr)
+			}
+			o.status.State, o.status.Error = SourceError, ptr(errText(err))
+			continue
+		}
+		rows = append(rows, mergeRows(len(opened)-1, files, issues)...)
+	}
+	return selected, opened, rows, nil
+}
+
+func closeOpened(opened []*openedSource) {
+	for _, o := range opened {
+		if o.root != nil {
+			_ = o.root.Close()
+		}
+	}
+}
+
+func allSourcesFailed(opened []*openedSource) bool {
+	if len(opened) == 0 {
+		return false
+	}
+	for _, o := range opened {
+		if o.status.State != SourceError {
+			return false
+		}
+	}
+	return true
 }
 
 func sortSources(s []config.Source) {

@@ -12,6 +12,8 @@ Spool reads native session files directly. Support is defined by the record stru
 
 Spool never reads SQLite state databases, fork-context parents, attachments, or other files referenced by a transcript, and never reconstructs an active conversation. Unsupported files appear as list diagnostics and fail `spool read` with `unsupported_format`.
 
+Search projects only an explicit subset of native text; the existing read adapter still preserves complete native records. See [search.md](search.md#searchable-native-text) for the precise Pi message, toolResult, branch-summary and compaction strings; Claude user/assistant content, nested tool-result content and summary strings; and Codex message text blocks, function-call outputs and compacted messages. Their documented pointers and exclusions are covered by synthetic extractor tests in [`internal/harness/text_test.go`](../internal/harness/text_test.go). Unknown shapes and metadata are never searched implicitly.
+
 ## Fixture provenance
 
 All fixtures are synthetic and contain only generic example paths and content. They were written to match:

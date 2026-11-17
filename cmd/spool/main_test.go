@@ -14,11 +14,11 @@ func TestRun(t *testing.T) {
 		wantStdout string
 		wantStderr string
 	}{
-		{name: "default help", wantStdout: "Usage: spool"},
+		{name: "default help", wantStdout: "spool search"},
 		{name: "explicit help", args: []string{"--help"}, wantStderr: "Usage: spool"},
 		{name: "version", args: []string{"--version"}, wantStdout: "spool dev\n"},
 		{name: "unknown flag", args: []string{"--unknown"}, code: 2, wantStderr: "flag provided but not defined"},
-		{name: "unknown command", args: []string{"search"}, code: 2, wantStderr: "unexpected argument"},
+		{name: "unknown command", args: []string{"unknown-command"}, code: 2, wantStderr: "unexpected argument"},
 		{name: "version with extra argument", args: []string{"--version", "extra"}, code: 2, wantStderr: "unexpected argument"},
 	}
 	for _, tt := range tests {
