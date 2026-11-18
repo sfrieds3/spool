@@ -17,10 +17,14 @@ import (
 )
 
 // SourceIdentity binds a full validated source to an exact regular file snapshot.
+// It keeps the original file open so its inode cannot be freed and reused by a
+// same-path replacement (Linux filesystems reuse inode numbers immediately).
+// The descriptor closes with the identity through os.File's GC cleanup.
 type SourceIdentity struct {
 	session history.Session
 	info    os.FileInfo
 	hash    [32]byte
+	file    *os.File
 }
 
 func (s *Service) sourceIdentity(ctx context.Context, sess *history.Session) (*SourceIdentity, error) {
@@ -43,7 +47,12 @@ func (s *Service) sourceIdentity(ctx context.Context, sess *history.Session) (*S
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	keep := false
+	defer func() {
+		if !keep {
+			f.Close()
+		}
+	}()
 	h := sha256.New()
 	if _, err := io.Copy(h, &contextReader{ctx: ctx, r: io.NewSectionReader(f, 0, info.Size())}); err != nil {
 		return nil, err
@@ -57,7 +66,8 @@ func (s *Service) sourceIdentity(ctx context.Context, sess *history.Session) (*S
 	}
 	var sum [32]byte
 	copy(sum[:], h.Sum(nil))
-	return &SourceIdentity{session: *sess, info: info, hash: sum}, nil
+	keep = true
+	return &SourceIdentity{session: *sess, info: info, hash: sum, file: f}, nil
 }
 func (s *Service) revalidate(ctx context.Context, old *SourceIdentity) error {
 	if old == nil {
@@ -71,6 +81,7 @@ func (s *Service) revalidate(ctx context.Context, old *SourceIdentity) error {
 	if err != nil {
 		return err
 	}
+	now.file.Close()
 	if !os.SameFile(old.info, now.info) || old.hash != now.hash || old.session.OriginalPath != sess.OriginalPath || old.session.Kind != sess.Kind || str(old.session.Cwd) != str(sess.Cwd) {
 		return errors.New("source changed; review and confirm again")
 	}
