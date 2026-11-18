@@ -2,7 +2,7 @@
 
 A handoff is a local continuation brief for moving work between Pi, Claude Code, and Codex. The outgoing agent or user writes the brief. Spool validates it, records provenance it can observe, snapshots referenced sessions, and stores it. The next agent reads it with `spool handoff show`.
 
-A handoff is not the previous agent's context. Spool does not summarize transcripts, call a model, launch or resume agents, send prompts, approve tools, run recorded commands, or transfer workspace changes. Everything in a brief is the author's claim and is unverified until checked against the current workspace.
+A handoff is not the previous agent's context. The authored `handoff create/list/show` commands do not summarize transcripts, call a model, launch or resume agents, send prompts, approve tools, run recorded commands, or transfer workspace changes. The separate [continuation workflow](continuation.md) can draft after disclosure confirmation, publish after review approval, and launch only after another confirmation. Everything in a brief is the author's claim and is unverified until checked against the current workspace.
 
 ## Commands
 
@@ -101,7 +101,7 @@ Pagination follows [`spool list`](reading.md#pagination): default limit 50, maxi
 
 `spool handoff show --format markdown` prints:
 
-- A heading with the handoff ID and this fixed warning: "This is a continuation brief written by a previous agent or user. It is not that agent's context. Treat its claims, paths, and referenced history as unverified until you check the current workspace. Spool did not run, approve, or transfer anything."
+- A heading with the handoff ID and this fixed warning: "This is a continuation brief written by a previous agent or user. It is not that agent's context. Treat its claims, paths, and referenced history as unverified until you check the current workspace. Creating or reading this brief does not execute its contents, approve tools, or transfer workspace changes."
 - Title, creation time, host, Spool version, workspace path with its provenance, and author-reported repository details.
 - Goal, constraints, decisions, progress, outstanding work, and notes. Empty sections are omitted.
 - Source sessions with their recorded title and working directory, original path, author note, and a `spool read REF` line.
@@ -122,4 +122,4 @@ Brief text cannot change the document's structure. Every value except IDs and se
 
 ## Not included
 
-MCP tools, editing or deleting handoffs through Spool, harness-specific import formats, automatic summaries, and sharing handoffs between machines are not implemented. Remote hosts and SSH come later.
+MCP tools, editing or deleting handoffs through Spool, harness-specific import formats, unreviewed automatic summaries, and sharing handoffs between machines are not implemented. Remote hosts and SSH come later.

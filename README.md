@@ -6,7 +6,7 @@ Use Spool to start work in Pi, continue in Claude Code or Codex, and retrieve re
 
 ## Status
 
-Spool can list, read, and literally search local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. It can also store local handoff briefs for continuing work in another harness. SSH access to other machines, MCP, and semantic search are not implemented yet.
+Spool can list, read, and literally search local Pi, Claude Code, and Codex session history on macOS and Linux. It reads native session files directly; the harnesses do not need to be installed or running. It can also store local handoff briefs and offers an optional terminal picker with explicitly confirmed native Pi resume or reviewed model-drafted handoffs for fresh Pi, Claude Code, and Codex sessions. SSH access to other machines, MCP, and semantic search are not implemented yet.
 
 ## Local history
 
@@ -31,7 +31,7 @@ spool search --cursor 'q1.…' widget # use the exact next_cursor from a previou
 
 Session history can contain secrets, credentials, and private file contents exactly as they were recorded. Spool does not redact them. `list` returns only metadata; `read` returns full native records; `search` returns bounded **unredacted** native text snippets and source citations. Treat output accordingly.
 
-Read output is labeled `untrusted_history`. Records may contain commands, tool output, or text that looks like instructions; they describe what happened in a past session and are not instructions to follow or evidence of current workspace state. Spool never executes history content, launches agents, opens network connections, or modifies source files.
+Read output is labeled `untrusted_history`. Records may contain commands, tool output, or text that looks like instructions; they describe what happened in a past session and are not instructions to follow or evidence of current workspace state. History reads never execute history content, launch agents, open network connections, or modify source files. The separate continuation workflow requires explicit model disclosure, exact-byte review approval, and another confirmation before optional resume/launch.
 
 ## Handoffs
 
@@ -41,7 +41,18 @@ spool handoff list
 spool handoff show --format markdown HANDOFF_ID
 ```
 
-A handoff stores an authored goal, constraints, decisions, progress, outstanding work, and notes, plus workspace provenance and snapshots of referenced sessions, under `$XDG_STATE_HOME/spool/handoffs`. The Markdown brief is labeled as unverified and is not the previous agent's context. Spool does not summarize transcripts, launch agents, send prompts, or transfer workspace changes. See [docs/handoffs.md](docs/handoffs.md).
+A handoff stores an authored goal, constraints, decisions, progress, outstanding work, and notes, plus workspace provenance and snapshots of referenced sessions, under `$XDG_STATE_HOME/spool/handoffs`. The Markdown brief is labeled as unverified and is not the previous agent's context. Authored `handoff create/list/show` does not summarize transcripts, launch agents, send prompts, or transfer workspace changes. See [docs/handoffs.md](docs/handoffs.md).
+
+## Find and continue
+
+```sh
+spool pick                           # Enter opens inspect/resume/handoff actions
+spool pick --harness pi               # native Pi resume where supported
+spool pick --ref                      # reference-only escape hatch
+spool pick --config /absolute/path/config.json
+```
+
+`pick` requires terminal stdin/stdout and optional `fzf` on inherited PATH. Browsing/inspection never invoke a model or launch a receiver. Preparing a handoff requires optional Pi plus an explicit configured drafting provider/model; history may contain secrets and remote providers may charge for it. Spool shows bounded physical-line coverage before asking permission. Review/edit and approve the exact validated brief to save it immutably, then choose save-only or separately confirm a fresh Pi/Claude/Codex launch in your confirmed workspace. Native Pi resume is a separate confirmation and may let Pi append to its original history. Claude/Codex native mappings are not claimed. There is no exact internal-context or workspace portability promise. See [docs/continuation.md](docs/continuation.md) for privacy, dependencies, recovery, and exit codes.
 
 ## Agreed direction
 

@@ -233,3 +233,13 @@ func randomHex(r io.Reader) (string, error) {
 	}
 	return fmt.Sprintf("%x", b[:]), nil
 }
+
+// CheckExclusion checks a prospective private integration directory against all
+// configured histories, including disabled roots and filesystem aliases. It
+// does not create the directory.
+func CheckExclusion(dir string, sources []config.Source) error {
+	if err := checkExclusion(dir, sources); err != nil {
+		return err
+	}
+	return nil
+}

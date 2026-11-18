@@ -62,8 +62,9 @@ type Source struct {
 type Config struct {
 	// Path is the configuration file that was loaded, or empty when built-in
 	// defaults were used because no default file exists.
-	Path    string
-	Sources []Source
+	Path     string
+	Sources  []Source
+	Drafting *Drafting
 }
 
 // Error reports invalid configuration. Callers map it to invalid_config.
@@ -208,8 +209,9 @@ func readLimited(path string) ([]byte, error) {
 }
 
 type fileConfig struct {
-	Version *int            `json:"version"`
-	Sources json.RawMessage `json:"sources"`
+	Version  *int            `json:"version"`
+	Sources  json.RawMessage `json:"sources"`
+	Drafting json.RawMessage `json:"drafting"`
 }
 
 type fileSource struct {
@@ -235,12 +237,16 @@ func Parse(data []byte, env Env) (*Config, error) {
 	if *fc.Version != Version {
 		return nil, invalid("unsupported version %d", *fc.Version)
 	}
+	drafting, err := parseDrafting(fc.Drafting)
+	if err != nil {
+		return nil, err
+	}
 	if fc.Sources == nil {
 		sources, err := DefaultSources(env)
 		if err != nil {
 			return nil, err
 		}
-		return &Config{Sources: sources}, nil
+		return &Config{Sources: sources, Drafting: drafting}, nil
 	}
 	if bytes.Equal(bytes.TrimSpace(fc.Sources), []byte("null")) {
 		return nil, invalid("sources must be an array")
@@ -249,7 +255,7 @@ func Parse(data []byte, env Env) (*Config, error) {
 	if err := json.Unmarshal(fc.Sources, &raw); err != nil {
 		return nil, invalid("sources must be an array")
 	}
-	cfg := &Config{Sources: make([]Source, 0, len(raw))}
+	cfg := &Config{Sources: make([]Source, 0, len(raw)), Drafting: drafting}
 	seen := map[string]bool{}
 	for i, item := range raw {
 		var fs fileSource
