@@ -124,22 +124,28 @@ func keys(m map[string]string) []string {
 	return out
 }
 
-// TestNoProcessOrNetworkDependencies proves structurally that the spool
-// binary cannot launch agents or open network clients: neither os/exec nor
-// net is linked into it.
-func TestNoProcessOrNetworkDependencies(t *testing.T) {
+// TestNoNetworkDependencies keeps native network clients out of Spool.
+// Explicit continuation integrations may use os/exec; existing history and
+// authored handoff commands are independently tested as inert.
+func TestNoNetworkDependencies(t *testing.T) {
+	for _, dep := range packageDependencies(t, ".") {
+		switch {
+		case dep == "net", strings.HasPrefix(dep, "net/http"), dep == "crypto/tls", dep == "plugin":
+			t.Errorf("spool depends on %s", dep)
+		}
+	}
+}
+
+// packageDependencies shares the real Go dependency probe across boundary tests.
+func packageDependencies(t *testing.T, pkg string) []string {
+	t.Helper()
 	gocmd, err := exec.LookPath("go")
 	if err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
-	out, err := exec.Command(gocmd, "list", "-deps", ".").Output()
+	out, err := exec.Command(gocmd, "list", "-deps", pkg).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, dep := range strings.Fields(string(out)) {
-		switch {
-		case dep == "os/exec", dep == "net", strings.HasPrefix(dep, "net/http"), dep == "crypto/tls", dep == "plugin":
-			t.Errorf("spool depends on %s", dep)
-		}
-	}
+	return strings.Fields(string(out))
 }

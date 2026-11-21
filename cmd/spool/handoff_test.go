@@ -273,15 +273,7 @@ func TestEndToEndHandoff(t *testing.T) {
 // TestHandoffPackagesAvoidProcessAndNetwork checks the handoff service's own
 // imports, complementing the whole-binary dependency check.
 func TestHandoffPackagesAvoidProcessAndNetwork(t *testing.T) {
-	gocmd, err := exec.LookPath("go")
-	if err != nil {
-		t.Skip("go toolchain not on PATH")
-	}
-	out, err := exec.Command(gocmd, "list", "-deps", "../../internal/handoff").Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, dep := range strings.Fields(string(out)) {
+	for _, dep := range packageDependencies(t, "../../internal/handoff") {
 		if dep == "os/exec" || dep == "net" || strings.HasPrefix(dep, "net/http") {
 			t.Errorf("internal/handoff depends on %s", dep)
 		}
