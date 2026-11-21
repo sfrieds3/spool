@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/sfrieds3/spool/compare/v0.1.0...v0.2.0) (2026-11-21)
+
+
+### Features
+
+* add interactive session continuation ([e1a6af6](https://github.com/sfrieds3/spool/commit/e1a6af6825ffd499bc00dd67f2312da9917f672e))
+
+
+### Bug Fixes
+
+* **continuation:** detect same-path source replacement on Linux ([65f3e8d](https://github.com/sfrieds3/spool/commit/65f3e8d24a6da2cfe91da1786d9707a7428cc997))
+
 ## 0.1.0 (2026-11-15)
 
 
