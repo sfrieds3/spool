@@ -7,7 +7,7 @@ Let work continue between Pi, Claude Code, and Codex through explicit, locally s
 
 ### Requirement: Authored brief content
 
-`spool handoff create` SHALL accept a version-1 JSON brief from an explicitly named input file or, when explicitly requested, stdin. The brief SHALL require a nonempty goal and MAY contain a title and lists of constraints, decisions, progress, outstanding work, and notes. Spool SHALL store the authored text as supplied and SHALL NOT infer, summarize, or generate brief content from history or a model.
+`spool handoff create` SHALL accept a version-1 JSON brief from an explicitly named input file or, when explicitly requested, stdin. The brief SHALL require a nonempty goal and MAY contain a title and lists of constraints, decisions, progress, outstanding work, and notes. `spool handoff create` SHALL store the supplied text literally and SHALL NOT infer, summarize, or generate content. A separate explicitly authorized continuation workflow can draft content for review; only the reviewed, approved brief is supplied to creation.
 
 #### Scenario: Minimal brief
 - **WHEN** a brief contains only a version and a goal
@@ -20,6 +20,10 @@ Let work continue between Pi, Claude Code, and Codex through explicit, locally s
 #### Scenario: No content is invented
 - **WHEN** a brief references sessions but supplies no decisions
 - **THEN** the handoff has an empty decision list rather than decisions derived from the referenced history
+
+#### Scenario: Reviewed model draft is supplied explicitly
+- **WHEN** a separately authorized drafting workflow supplies a user-reviewed and approved version-1 brief
+- **THEN** creation validates and stores those supplied bytes without invoking a model or accepting unreviewed generated content
 
 ### Requirement: Strict brief validation
 
